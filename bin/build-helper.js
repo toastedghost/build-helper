@@ -17,26 +17,33 @@ var isFileReadable = utils.isFileReadable;
 var isDefined = utils.isDefined;
 
 var config = isFileReadable(buildConfigPath) ? require(buildConfigPath) : {};
-var userPackage = isFileReadable(packageDefinitionPathNpm) ? require(packageDefinitionPathNpm) : {};
-var packageDefinitionPath = packageDefinitionPathNpm;
-if(!Object.getOwnPropertyNames(userPackage).length) {
-  userPackage = isFileReadable(packageDefinitionPathComposer) ? require(packageDefinitionPathComposer) : {};
-  packageDefinitionPath = packageDefinitionPathComposer;
+
+var userPackage = {};
+var packageDefinitionPath = null;
+
+// check git info
+var gitInfo = gitDescribeSync(process.cwd(), {
+  match: '[0-9]*.[0-9]*.[0-9]*'
+});
+if (gitInfo.semver && gitInfo.semver.version) {
+  userPackage.name = path.basename(process.cwd());
+  userPackage.version = gitInfo.semver.version;
 }
-if(!Object.getOwnPropertyNames(userPackage).length) {
-  console.log(chalk.yellow('no project file (package.json or composer.json), testing for tags'))
-  var gitInfo = gitDescribeSync(process.cwd(), {
-    match: '[0-9]*.[0-9]*.[0-9]*'
-  });
-  if (gitInfo.semver && gitInfo.semver.version) {
-    userPackage.version = gitInfo.semver.version;
-    userPackage.status = false;
-    userPackage.name = path.basename(process.cwd());
-    packageDefinitionPath = null;
-  } else {
-    console.log(chalk.red('no valid tags found'))
-    process.exit(1);
-  }
+// Checking for package definition
+if (isFileReadable(packageDefinitionPathNpm)) {
+  userPackage = extend({}, userPackage, require(packageDefinitionPathNpm));
+  packageDefinitionPath = packageDefinitionPathNpm;
+} else if (isFileReadable(packageDefinitionPathComposer)) {
+  userPackage = extend({}, userPackage, require(packageDefinitionPathComposer));
+  packageDefinitionPath = packageDefinitionPathComposer;
+} else {
+  userPackage.status = false;
+}
+
+// only valid, if the version and name element is set
+if(!(Object.getOwnPropertyNames(userPackage).length) || !(userPackage.hasOwnProperty('version') && userPackage.hasOwnProperty('name'))) {
+  console.log(chalk.red('no project file (package.json or composer.json) and no valid tag found'))
+  process.exit(1);
 }
 
 var options = {
