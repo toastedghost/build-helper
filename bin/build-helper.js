@@ -23,20 +23,22 @@ var options = {};
 var cleanup = false;
 
 var getProject = function() {
+  var version = git.getLastTagSync();
+  if (semver.valid(version)) {
+    project.version = version;
+    project.status = false;
+    project.name = path.basename(process.cwd());
+  }
+
   options.packageDefinitionPath = _.getPackage(process.cwd());
   if (options.packageDefinitionPath) {
-    project = require(options.packageDefinitionPath);
-  } else {
-    console.log(chalk.yellow('no project file (package.json or composer.json), testing for tags'))
-    var version = git.getLastTagSync();
-    if (semver.valid(version)) {
-      project.version = version;
-      project.status = false;
-      project.name = path.basename(process.cwd());
-    } else {
-      console.log(chalk.red('no valid tags found'));
-      process.exit(1);
-    }
+    delete project.status;
+    project = _.extend({}, project, require(options.packageDefinitionPath));
+  }
+
+  if(!(Object.getOwnPropertyNames(project).length) || !(project.hasOwnProperty('version') && project.hasOwnProperty('name'))) {
+    console.log(chalk.red('no project file (package.json or composer.json) and no valid tag found'));
+    process.exit(1);
   }
 };
 
